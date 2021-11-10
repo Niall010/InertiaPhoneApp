@@ -1,5 +1,6 @@
 package com.example.inertiaphoneapp;
 
+import androidx.annotation.RequiresApi;
 import androidx.appcompat.app.AppCompatActivity;
 
 import android.content.Context;
@@ -7,7 +8,11 @@ import android.hardware.Sensor;
 import android.hardware.SensorEvent;
 import android.hardware.SensorEventListener;
 import android.hardware.SensorManager;
+import android.hardware.camera2.CameraAccessException;
+import android.hardware.camera2.CameraManager;
+import android.hardware.lights.LightsManager;
 import android.os.AsyncTask;
+import android.os.Build;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.View;
@@ -31,6 +36,8 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
     private float millisPerFrame;
     long elapsedTimeMillis;
     private boolean isSendingData;
+    private String ipAddress;
+    private int port;
 
     //Init up sensor manager
     private SensorManager sensorManager;
@@ -49,20 +56,29 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
     private TextView frameRateText;
     private Button sendDataButton;
     private Button setFrameRateButton;
+    private TextView ipAddressText;
+    private TextView portText;
+    private Button connectionButton;
 
     private InertiaData inertiaData;
 
+    //flash light signal
+    private CameraManager cameraManager;
+    private String cameraID;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
+        //Initialise Variables
         frame = 0;
         millisPerFrame = 1000/60; //60fps initialised
         frameTime = System.currentTimeMillis();
         isSendingData = false;
         inertiaData = new InertiaData();
+        ipAddress = "192.168.1.78";
+        port = 6000;
 
         //Get UI Elements
         accelerometerText = findViewById(R.id.accelerometerText);
@@ -73,40 +89,82 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         sendDataButton = findViewById(R.id.sendDataButton);
         setFrameRateButton = findViewById(R.id.setFrameRateButton);
         frameRateText = findViewById(R.id.frameRateText);
+        ipAddressText = findViewById(R.id.ipAddressText);
+        portText = findViewById(R.id.portText);
+        connectionButton = findViewById(R.id.connectionButton);
 
+        //Initialise Sensors
         sensorManager = (SensorManager) getSystemService(Context.SENSOR_SERVICE);
-
         sensorAccelerometer = sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER);
         sensorGravity = sensorManager.getDefaultSensor(Sensor.TYPE_GRAVITY);
         sensorGyro = sensorManager.getDefaultSensor(Sensor.TYPE_GYROSCOPE);
         sensorLinearAcceleration = sensorManager.getDefaultSensor(Sensor.TYPE_LINEAR_ACCELERATION);
         sensorRotationVector = sensorManager.getDefaultSensor(Sensor.TYPE_ROTATION_VECTOR);
 
+        //Create listeners for change of sensors
         sensorManager.registerListener(MainActivity.this, sensorAccelerometer, SensorManager.SENSOR_DELAY_FASTEST);
         sensorManager.registerListener(MainActivity.this, sensorGravity, SensorManager.SENSOR_DELAY_FASTEST);
         sensorManager.registerListener(MainActivity.this, sensorGyro, SensorManager.SENSOR_DELAY_FASTEST);
         sensorManager.registerListener(MainActivity.this, sensorLinearAcceleration, SensorManager.SENSOR_DELAY_FASTEST);
         sensorManager.registerListener(MainActivity.this, sensorRotationVector, SensorManager.SENSOR_DELAY_FASTEST);
 
+        //Initialise Camera Flash
+        cameraManager = (CameraManager) getSystemService(Context.CAMERA_SERVICE);
+        try {
+            cameraID = cameraManager.getCameraIdList() [0]; //0 for back camera
+        } catch (CameraAccessException e) {
+            e.printStackTrace();
+        }
+
+
 
         sendDataButton.setOnClickListener(new View.OnClickListener() {
+            @RequiresApi(api = Build.VERSION_CODES.M)
             @Override
             public void onClick(View v) {
               isSendingData = !isSendingData;
+
+
+                if(isSendingData)
+              {
+                  sendDataButton.setText("Stop Sending Data");
+
+                  try {
+                      cameraManager.setTorchMode(cameraID, true);
+                  } catch (CameraAccessException e) {
+                      e.printStackTrace();
+                  }
+              }
+              else
+              {
+                  sendDataButton.setText("Send Data");
+              }
+
             }
         });
 
         setFrameRateButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                millisPerFrame = 1000/Long.parseLong(frameRateText.getText().toString());
+
+                millisPerFrame = 1000/Float.parseFloat(frameRateText.getText().toString());
             }
         });
+
+        connectionButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                ipAddress = ipAddressText.getText().toString();
+                port = Integer.parseInt(portText.getText().toString());
+            }
+        });
+
 
     }
 
 
 
+    @RequiresApi(api = Build.VERSION_CODES.M)
     @Override
     public void onSensorChanged(SensorEvent event) {
         //Assign UI live data#
@@ -140,11 +198,16 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
 
         if(isSendingData == true) {
             //send data every 16 milliseconds, therefore 999 every second almost 60fps
-            if (elapsedTimeMillis > frame) {
+            if (elapsedTimeMillis > millisPerFrame) {
                 frameTime = System.currentTimeMillis();
                 BackgroundTask b1 = new BackgroundTask();
                 b1.execute("frame " +  frame + " " + inertiaData.convertToString(inertiaData));
                 frame++;
+            }
+            try {
+                cameraManager.setTorchMode(cameraID, false);
+            } catch (CameraAccessException e) {
+                e.printStackTrace();
             }
         }
     }
@@ -171,7 +234,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         protected Void doInBackground(String... voids) {
             try {
                 String message = voids[0];
-                s = new Socket("192.168.1.78", 6000);
+                s = new Socket(ipAddress, port);
                 writer = new PrintWriter(s.getOutputStream());
                 writer.write(String.valueOf(message));
                 writer.flush();
