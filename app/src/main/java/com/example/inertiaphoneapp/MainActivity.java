@@ -10,20 +10,19 @@ import android.hardware.SensorEventListener;
 import android.hardware.SensorManager;
 import android.hardware.camera2.CameraAccessException;
 import android.hardware.camera2.CameraManager;
-import android.hardware.lights.LightsManager;
 import android.os.AsyncTask;
 import android.os.Build;
 import android.os.Bundle;
-import android.util.Log;
 import android.view.View;
 import android.widget.Button;
-import android.widget.Switch;
 import android.widget.TextView;
 
 import java.io.IOException;
+import java.io.OutputStream;
 import java.io.PrintWriter;
 import java.math.BigDecimal;
 import java.net.Socket;
+import java.util.ArrayList;
 import java.util.Arrays;
 
 
@@ -38,6 +37,9 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
     private boolean isSendingData;
     private String ipAddress;
     private int port;
+    private int sensorUpdateTime;
+    private long refreshFreq;
+    private long refreshRate;
 
     //Init up sensor manager
     private SensorManager sensorManager;
@@ -59,6 +61,8 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
     private TextView ipAddressText;
     private TextView portText;
     private Button connectionButton;
+    private TextView framesText;
+    private TextView refreshText;
 
     private InertiaData inertiaData;
 
@@ -73,12 +77,15 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
 
         //Initialise Variables
         frame = 0;
-        millisPerFrame = 1000/60; //60fps initialised
+        millisPerFrame = 1000/30; //30fps initialised
         frameTime = System.currentTimeMillis();
         isSendingData = false;
         inertiaData = new InertiaData();
         ipAddress = "192.168.1.78";
         port = 6000;
+        sensorUpdateTime = 1000; //10 milliseconds
+        refreshFreq = 0; //Hz
+        refreshRate = System.currentTimeMillis(); //elapsed time per frame
 
         //Get UI Elements
         accelerometerText = findViewById(R.id.accelerometerText);
@@ -92,6 +99,8 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         ipAddressText = findViewById(R.id.ipAddressText);
         portText = findViewById(R.id.portText);
         connectionButton = findViewById(R.id.connectionButton);
+        framesText = findViewById(R.id.framesText);
+        refreshText = findViewById(R.id.refreshText);
 
         //Initialise Sensors
         sensorManager = (SensorManager) getSystemService(Context.SENSOR_SERVICE);
@@ -102,11 +111,11 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         sensorRotationVector = sensorManager.getDefaultSensor(Sensor.TYPE_ROTATION_VECTOR);
 
         //Create listeners for change of sensors
-        sensorManager.registerListener(MainActivity.this, sensorAccelerometer, SensorManager.SENSOR_DELAY_FASTEST);
-        sensorManager.registerListener(MainActivity.this, sensorGravity, SensorManager.SENSOR_DELAY_FASTEST);
-        sensorManager.registerListener(MainActivity.this, sensorGyro, SensorManager.SENSOR_DELAY_FASTEST);
-        sensorManager.registerListener(MainActivity.this, sensorLinearAcceleration, SensorManager.SENSOR_DELAY_FASTEST);
-        sensorManager.registerListener(MainActivity.this, sensorRotationVector, SensorManager.SENSOR_DELAY_FASTEST);
+        sensorManager.registerListener(MainActivity.this, sensorAccelerometer, sensorUpdateTime);
+        sensorManager.registerListener(MainActivity.this, sensorGravity, sensorUpdateTime);
+        sensorManager.registerListener(MainActivity.this, sensorGyro, sensorUpdateTime);
+        sensorManager.registerListener(MainActivity.this, sensorLinearAcceleration, sensorUpdateTime);
+        sensorManager.registerListener(MainActivity.this, sensorRotationVector,  sensorUpdateTime);
 
         //Initialise Camera Flash
         cameraManager = (CameraManager) getSystemService(Context.CAMERA_SERVICE);
@@ -158,8 +167,6 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
                 port = Integer.parseInt(portText.getText().toString());
             }
         });
-
-
     }
 
 
@@ -172,37 +179,44 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         String text = "";
         elapsedTimeMillis = System.currentTimeMillis() - frameTime;
 
+        refreshFreq = (System.currentTimeMillis() - refreshRate);
+        refreshRate = System.currentTimeMillis();
+        refreshText.setText(String.valueOf(refreshFreq));
+
 
         //Get most recent sensor update and assign to class object inertiaData + print
         if (sensor.getType() == Sensor.TYPE_ACCELEROMETER) {
-            text = ("X: " + round(event.values[0], 2) + " Y: " + round(event.values[1], 2) + " Z: " + round(event.values[2], 2));
+            text = ("X: " + HelperClass.round(event.values[0], 2) + " Y: " + HelperClass.round(event.values[1], 2) + " Z: " + HelperClass.round(event.values[2], 2));
             inertiaData.setAccelerometerVector(event.values);
             accelerometerText.setText(text);
         } else if (sensor.getType() == Sensor.TYPE_GRAVITY) {
-            text = ("X: " + round(event.values[0], 2) + " Y: " + round(event.values[1], 2) + " Z: " + round(event.values[2], 2));
+            text = ("X: " + HelperClass.round(event.values[0], 2) + " Y: " + HelperClass.round(event.values[1], 2) + " Z: " + HelperClass.round(event.values[2], 2));
             inertiaData.setGravityVector(event.values);
             gravityText.setText(text);
         } else if (sensor.getType() == Sensor.TYPE_GYROSCOPE) {
-            text = ("X: " + round(event.values[0], 2) + " Y: " + round(event.values[1], 2) + " Z: " + round(event.values[2], 2));
+            text = ("X: " + HelperClass.round(event.values[0], 2) + " Y: " + HelperClass.round(event.values[1], 2) + " Z: " + HelperClass.round(event.values[2], 2));
             inertiaData.setGyroVector(event.values);
             gyroText.setText(text);
         } else if (sensor.getType() == Sensor.TYPE_LINEAR_ACCELERATION) {
             inertiaData.setLinearAccelerationVector(event.values);
-            text = ("X: " + round(event.values[0], 2) + " Y: " + round(event.values[1], 2) + " Z: " + round(event.values[2], 2));
+            text = ("X: " + HelperClass.round(event.values[0], 2) + " Y: " + HelperClass.round(event.values[1], 2) + " Z: " + HelperClass.round(event.values[2], 2));
             linearAccelerationText.setText(text);
         } else if (sensor.getType() == Sensor.TYPE_ROTATION_VECTOR) {
             inertiaData.setRotationVector(event.values);
-            text = ("X: " + round(event.values[0], 2) + " Y: " + round(event.values[1], 2) + " Z: " + round(event.values[2], 2) + " Vector: " + round(event.values[3], 2));
+            text = ("X: " + HelperClass.round(event.values[0], 2) + " Y: " + HelperClass.round(event.values[1], 2) + " Z: " + HelperClass.round(event.values[2], 2) + " Vector: " + HelperClass.round(event.values[3], 2));
             rotationVectorText.setText(text);
         }
 
+
         if(isSendingData == true) {
-            //send data every 16 milliseconds, therefore 999 every second almost 60fps
             if (elapsedTimeMillis > millisPerFrame) {
                 frameTime = System.currentTimeMillis();
+
                 BackgroundTask b1 = new BackgroundTask();
+                inertiaData.setDisplacement(getDisplacement(0, inertiaData.getLinearAccelerationVector(),millisPerFrame/1000));
                 b1.execute("frame " +  frame + " " + inertiaData.convertToString(inertiaData));
                 frame++;
+                framesText.setText(String.valueOf(frame));
             }
             try {
                 cameraManager.setTorchMode(cameraID, false);
@@ -210,6 +224,22 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
                 e.printStackTrace();
             }
         }
+
+    }
+
+    public static float[] getDisplacement(float initialVelocity, float acceleration[], double time)
+    {
+        //calculated in meters, converted to millimeters
+        String strDisplacement =" X: " + String.valueOf( ((initialVelocity*time) + 0.5*(acceleration[0]*(time*time)))*1000  ) +
+                                " Y: " + String.valueOf( ((initialVelocity*time) + 0.5*(acceleration[1]*(time*time)))*1000  ) +
+                                " Z: " +String.valueOf( ((initialVelocity*time) + 0.5*(acceleration[2]*(time*time)))*1000 );
+
+        float[] displacement = new float[3];
+        displacement[0] = (float) (((initialVelocity * time) + 0.5 * (acceleration[0] * (time * time))) * 1000);
+        displacement[1] = (float) (((initialVelocity * time) + 0.5 * (acceleration[1] * (time * time))) * 1000);
+        displacement[2] = (float) (((initialVelocity * time) + 0.5 * (acceleration[2] * (time * time))) * 1000);
+
+        return displacement;
     }
 
     @Override
@@ -217,17 +247,12 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
 
     }
 
-    public static float round(float d, int decimalPlace) {
-        BigDecimal bd = new BigDecimal(Float.toString(d));
-        bd = bd.setScale(decimalPlace, BigDecimal.ROUND_HALF_UP);
-        return bd.floatValue();
-    }
-
-
 
     class BackgroundTask extends AsyncTask<String,Void,Void>
     {
         Socket s;
+        OutputStream os;
+
         PrintWriter writer;
 
         @Override
@@ -235,10 +260,25 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
             try {
                 String message = voids[0];
                 s = new Socket(ipAddress, port);
+              //  os = s.getOutputStream();
                 writer = new PrintWriter(s.getOutputStream());
                 writer.write(String.valueOf(message));
                 writer.flush();
                 writer.close();
+
+/*
+                // Sending to c# sockets
+                byte[] toSendBytes = message.getBytes();
+                int toSendLen = toSendBytes.length;
+                byte[] toSendLenBytes = new byte[4];
+                toSendLenBytes[0] = (byte)(toSendLen & 0xff);
+                toSendLenBytes[1] = (byte)((toSendLen >> 8) & 0xff);
+                toSendLenBytes[2] = (byte)((toSendLen >> 16) & 0xff);
+                toSendLenBytes[3] = (byte)((toSendLen >> 24) & 0xff);
+                os.write(toSendLenBytes);
+                os.write(toSendBytes);
+*/
+
                 s.close();
             }
             catch(IOException e)
@@ -247,6 +287,11 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
             }
             return null;
         }
+
+
+
+
+
     }
 
     class InertiaData
@@ -257,6 +302,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         float gyroVector[];
         float linearAccelerationVector[];
         float rotationVector[];
+        float displacement[];
 
         public void setAccelerometerVector(float[] accelerometerVector) { this.accelerometerVector = accelerometerVector; }
 
@@ -278,6 +324,10 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
 
         public float[] getRotationVector() { return rotationVector; }
 
+        public float[] getDisplacement() { return displacement; }
+
+        public void setDisplacement(float[] displacement) { this.displacement = displacement; }
+
         public String convertToString(InertiaData data)
         {
             String text = "";
@@ -285,7 +335,8 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
                     "Gravity:" + Arrays.toString(data.getGravityVector()) +
                     "Gyro:" + Arrays.toString(data.getGyroVector()) +
                     "LinearAcceleration:" + Arrays.toString(data.getLinearAccelerationVector()) +
-                    "Rotation:" + Arrays.toString(data.getRotationVector())
+                    "Rotation:" + Arrays.toString(data.getRotationVector()) +
+                    "Linear Displacement: " + Arrays.toString(data.getDisplacement())
             );
 
             return text;
