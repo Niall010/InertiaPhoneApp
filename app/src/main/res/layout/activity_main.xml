@@ -55,98 +55,118 @@
             android:padding="10dp"
             app:layout_constraintBottom_toBottomOf="parent"
             app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintHorizontal_bias="1.0"
             app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toBottomOf="@+id/textView3">
+            app:layout_constraintTop_toBottomOf="@+id/textView3"
+            app:layout_constraintVertical_bias="0.0">
+
+            <TextView
+                android:id="@+id/framesLabel"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:padding="5dp"
+                android:text="Frames Captured"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintTop_toBottomOf="@+id/rotationVectorLabel" />
+
+            <TextView
+                android:id="@+id/framesText"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:padding="5dp"
+                android:text="0"
+                app:layout_constraintEnd_toEndOf="parent"
+                app:layout_constraintTop_toBottomOf="@+id/rotationVectorText" />
 
             <TextView
                 android:id="@+id/accelerometerLabel"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
+                android:padding="5dp"
                 android:text="Accelerometer"
-                app:layout_constraintTop_toTopOf="parent"
                 app:layout_constraintStart_toStartOf="parent"
-                android:padding="5dp"/>
+                app:layout_constraintTop_toTopOf="parent" />
 
             <TextView
                 android:id="@+id/accelerometerText"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="(0,0,0,0)"
                 android:padding="5dp"
-                app:layout_constraintTop_toTopOf="parent"
-                app:layout_constraintEnd_toEndOf="parent"/>
+                android:text="(0,0,0,0)"
+                app:layout_constraintEnd_toEndOf="parent"
+                app:layout_constraintTop_toTopOf="parent" />
 
             <TextView
                 android:id="@+id/gyroLabel"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
+                android:padding="5dp"
                 android:text="Gyroscope"
-                app:layout_constraintTop_toBottomOf="@id/accelerometerLabel"
                 app:layout_constraintStart_toStartOf="parent"
-                android:padding="5dp"/>
+                app:layout_constraintTop_toBottomOf="@id/accelerometerLabel" />
 
             <TextView
                 android:id="@+id/gyroText"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="(0,0,0,0)"
                 android:padding="5dp"
-                app:layout_constraintTop_toBottomOf="@id/accelerometerText"
-                app:layout_constraintEnd_toEndOf="parent"/>
+                android:text="(0,0,0,0)"
+                app:layout_constraintEnd_toEndOf="parent"
+                app:layout_constraintTop_toBottomOf="@id/accelerometerText" />
 
             <TextView
                 android:id="@+id/gravityLabel"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
+                android:padding="5dp"
                 android:text="Gravity"
-                app:layout_constraintTop_toBottomOf="@id/gyroLabel"
                 app:layout_constraintStart_toStartOf="parent"
-                android:padding="5dp"/>
+                app:layout_constraintTop_toBottomOf="@id/gyroLabel" />
 
             <TextView
                 android:id="@+id/gravityText"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="(0,0,0,0)"
                 android:padding="5dp"
-                app:layout_constraintTop_toBottomOf="@id/gyroText"
-                app:layout_constraintEnd_toEndOf="parent"/>
+                android:text="(0,0,0,0)"
+                app:layout_constraintEnd_toEndOf="parent"
+                app:layout_constraintTop_toBottomOf="@id/gyroText" />
 
             <TextView
                 android:id="@+id/linearAccelerationLabel"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
+                android:padding="5dp"
                 android:text="Linear Acc"
-                app:layout_constraintTop_toBottomOf="@id/gravityLabel"
                 app:layout_constraintStart_toStartOf="parent"
-                android:padding="5dp"/>
+                app:layout_constraintTop_toBottomOf="@id/gravityLabel" />
 
             <TextView
                 android:id="@+id/linearAccelerationText"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="(0,0,0,0)"
                 android:padding="5dp"
-                app:layout_constraintTop_toBottomOf="@id/gravityText"
-                app:layout_constraintEnd_toEndOf="parent"/>
+                android:text="(0,0,0,0)"
+                app:layout_constraintEnd_toEndOf="parent"
+                app:layout_constraintTop_toBottomOf="@id/gravityText" />
 
             <TextView
                 android:id="@+id/rotationVectorLabel"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="Rotation"
-                app:layout_constraintTop_toBottomOf="@id/linearAccelerationLabel"
+                android:padding="5dp"
+                android:text="Rotation Vector"
                 app:layout_constraintStart_toStartOf="parent"
-                android:padding="5dp"/>
+                app:layout_constraintTop_toBottomOf="@id/linearAccelerationLabel" />
 
             <TextView
                 android:id="@+id/rotationVectorText"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="(0,0,0,0)"
                 android:padding="5dp"
-                app:layout_constraintTop_toBottomOf="@id/linearAccelerationText"
-                app:layout_constraintEnd_toEndOf="parent"/>
+                android:text="(0,0,0,0)"
+                app:layout_constraintEnd_toEndOf="parent"
+                app:layout_constraintTop_toBottomOf="@id/linearAccelerationText" />
 
             <Button
                 android:id="@+id/sendDataButton"

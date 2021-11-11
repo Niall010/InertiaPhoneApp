@@ -10,17 +10,15 @@ import android.hardware.SensorEventListener;
 import android.hardware.SensorManager;
 import android.hardware.camera2.CameraAccessException;
 import android.hardware.camera2.CameraManager;
-import android.hardware.lights.LightsManager;
 import android.os.AsyncTask;
 import android.os.Build;
 import android.os.Bundle;
-import android.util.Log;
 import android.view.View;
 import android.widget.Button;
-import android.widget.Switch;
 import android.widget.TextView;
 
 import java.io.IOException;
+import java.io.OutputStream;
 import java.io.PrintWriter;
 import java.math.BigDecimal;
 import java.net.Socket;
@@ -59,6 +57,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
     private TextView ipAddressText;
     private TextView portText;
     private Button connectionButton;
+    private TextView framesText;
 
     private InertiaData inertiaData;
 
@@ -92,6 +91,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         ipAddressText = findViewById(R.id.ipAddressText);
         portText = findViewById(R.id.portText);
         connectionButton = findViewById(R.id.connectionButton);
+        framesText = findViewById(R.id.framesText);
 
         //Initialise Sensors
         sensorManager = (SensorManager) getSystemService(Context.SENSOR_SERVICE);
@@ -158,8 +158,6 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
                 port = Integer.parseInt(portText.getText().toString());
             }
         });
-
-
     }
 
 
@@ -203,6 +201,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
                 BackgroundTask b1 = new BackgroundTask();
                 b1.execute("frame " +  frame + " " + inertiaData.convertToString(inertiaData));
                 frame++;
+                framesText.setText(String.valueOf(frame));
             }
             try {
                 cameraManager.setTorchMode(cameraID, false);
@@ -228,6 +227,9 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
     class BackgroundTask extends AsyncTask<String,Void,Void>
     {
         Socket s;
+        OutputStream os;
+
+
         PrintWriter writer;
 
         @Override
@@ -235,10 +237,25 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
             try {
                 String message = voids[0];
                 s = new Socket(ipAddress, port);
+              //  os = s.getOutputStream();
                 writer = new PrintWriter(s.getOutputStream());
                 writer.write(String.valueOf(message));
                 writer.flush();
                 writer.close();
+
+/*
+                // Sending to c# sockets
+                byte[] toSendBytes = message.getBytes();
+                int toSendLen = toSendBytes.length;
+                byte[] toSendLenBytes = new byte[4];
+                toSendLenBytes[0] = (byte)(toSendLen & 0xff);
+                toSendLenBytes[1] = (byte)((toSendLen >> 8) & 0xff);
+                toSendLenBytes[2] = (byte)((toSendLen >> 16) & 0xff);
+                toSendLenBytes[3] = (byte)((toSendLen >> 24) & 0xff);
+                os.write(toSendLenBytes);
+                os.write(toSendBytes);
+*/
+
                 s.close();
             }
             catch(IOException e)
@@ -247,6 +264,11 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
             }
             return null;
         }
+
+
+
+
+
     }
 
     class InertiaData
