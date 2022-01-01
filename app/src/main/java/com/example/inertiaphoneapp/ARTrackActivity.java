@@ -30,7 +30,7 @@ public class ARTrackActivity extends AppCompatActivity {
     private Session mSession;
     private Camera camera;
     //3d model credit : google.poly.com
-    private String Model_URL = "https://github.com/google/model-viewer/blob/master/packages/shared-assets/models/Astronaut.glb?raw=true";
+    private String Model_URL = "https://github.com/Niall010/InertiaPhoneApp/blob/master/app/sampledata/AnchorModel.glb?raw=true";
 
     @RequiresApi(api = Build.VERSION_CODES.N)
     @Override
@@ -39,18 +39,9 @@ public class ARTrackActivity extends AppCompatActivity {
         setContentView(R.layout.activity_artrack);
         arFragment = (ArFragment) getSupportFragmentManager().findFragmentById(R.id.fragment);
 
-        mSession = null;
-        Config config = new Config(mSession);
-
-        mSession.configure(config);
-
         setUpModel();
         setUpPlane();
 
-
-        if(camera.getTrackingState().equals(TrackingState.TRACKING)) {
-            Log.d("ARDebug", camera.getDisplayOrientedPose().getTranslation().toString());
-        }
     }
 
     @RequiresApi(api = Build.VERSION_CODES.N)
@@ -61,7 +52,7 @@ public class ARTrackActivity extends AppCompatActivity {
                                 this,
                                 Uri.parse(Model_URL),
                                 RenderableSource.SourceType.GLB)
-                                .setScale(0.1f)
+                                .setScale(0.01f)
                                 .setRecenterMode(RenderableSource.RecenterMode.ROOT)
                                 .build())
 
