@@ -4,11 +4,11 @@ import androidx.annotation.RequiresApi;
 import androidx.appcompat.app.AppCompatActivity;
 
 import android.content.Context;
+import android.content.Intent;
 import android.hardware.Sensor;
 import android.hardware.SensorEvent;
 import android.hardware.SensorEventListener;
 import android.hardware.SensorManager;
-import android.hardware.camera2.CameraAccessException;
 import android.hardware.camera2.CameraManager;
 import android.os.AsyncTask;
 import android.os.Build;
@@ -20,9 +20,7 @@ import android.widget.TextView;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.io.PrintWriter;
-import java.math.BigDecimal;
 import java.net.Socket;
-import java.util.ArrayList;
 import java.util.Arrays;
 
 
@@ -40,6 +38,8 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
     private int sensorUpdateTime;
     private long refreshFreq;
     private long refreshRate;
+    float[] previousDisplacement = new float[3];
+    float[] initialVelocity = new float[3];
 
     //Init up sensor manager
     private SensorManager sensorManager;
@@ -48,6 +48,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
     private Sensor sensorGyro;
     private Sensor sensorLinearAcceleration;
     private Sensor sensorRotationVector;
+    private Sensor sensorMagneticField;
 
     //Init UI Elements
     private TextView accelerometerText;
@@ -63,6 +64,8 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
     private Button connectionButton;
     private TextView framesText;
     private TextView refreshText;
+    private TextView magnetometerText;
+    private Button arTrackButton;
 
     private InertiaData inertiaData;
 
@@ -81,7 +84,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         frameTime = System.currentTimeMillis();
         isSendingData = false;
         inertiaData = new InertiaData();
-        ipAddress = "192.168.1.78";
+        ipAddress = "192.168.1.101";
         port = 6000;
         sensorUpdateTime = 1000; //10 milliseconds
         refreshFreq = 0; //Hz
@@ -101,6 +104,8 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         connectionButton = findViewById(R.id.connectionButton);
         framesText = findViewById(R.id.framesText);
         refreshText = findViewById(R.id.refreshText);
+        magnetometerText = findViewById(R.id.magnetometerText);
+        arTrackButton = findViewById(R.id.arTrackButton);
 
         //Initialise Sensors
         sensorManager = (SensorManager) getSystemService(Context.SENSOR_SERVICE);
@@ -109,6 +114,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         sensorGyro = sensorManager.getDefaultSensor(Sensor.TYPE_GYROSCOPE);
         sensorLinearAcceleration = sensorManager.getDefaultSensor(Sensor.TYPE_LINEAR_ACCELERATION);
         sensorRotationVector = sensorManager.getDefaultSensor(Sensor.TYPE_ROTATION_VECTOR);
+        sensorMagneticField = sensorManager.getDefaultSensor(Sensor.TYPE_MAGNETIC_FIELD);
 
         //Create listeners for change of sensors
         sensorManager.registerListener(MainActivity.this, sensorAccelerometer, sensorUpdateTime);
@@ -116,7 +122,9 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         sensorManager.registerListener(MainActivity.this, sensorGyro, sensorUpdateTime);
         sensorManager.registerListener(MainActivity.this, sensorLinearAcceleration, sensorUpdateTime);
         sensorManager.registerListener(MainActivity.this, sensorRotationVector,  sensorUpdateTime);
+        sensorManager.registerListener(MainActivity.this, sensorMagneticField,  sensorUpdateTime);
 
+/*
         //Initialise Camera Flash
         cameraManager = (CameraManager) getSystemService(Context.CAMERA_SERVICE);
         try {
@@ -124,6 +132,16 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         } catch (CameraAccessException e) {
             e.printStackTrace();
         }
+ */
+
+        arTrackButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                Intent intent = new Intent(MainActivity.this, ARTrackActivity.class);
+                startActivity(intent);
+
+            }
+        });
 
 
 
@@ -137,12 +155,14 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
                 if(isSendingData)
               {
                   sendDataButton.setText("Stop Sending Data");
-
+/*
                   try {
                       cameraManager.setTorchMode(cameraID, true);
                   } catch (CameraAccessException e) {
                       e.printStackTrace();
                   }
+
+ */
               }
               else
               {
@@ -180,8 +200,16 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         elapsedTimeMillis = System.currentTimeMillis() - frameTime;
 
         refreshFreq = (System.currentTimeMillis() - refreshRate);
+        if(refreshFreq  != 0)
+        {
+            refreshFreq = 1/refreshFreq;
+            refreshText.setText(String.valueOf(refreshFreq) + "Hz");
+        }
+        else
+        {
+            refreshText.setText("null");
+        }
         refreshRate = System.currentTimeMillis();
-        refreshText.setText(String.valueOf(refreshFreq));
 
 
         //Get most recent sensor update and assign to class object inertiaData + print
@@ -205,41 +233,89 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
             inertiaData.setRotationVector(event.values);
             text = ("X: " + HelperClass.round(event.values[0], 2) + " Y: " + HelperClass.round(event.values[1], 2) + " Z: " + HelperClass.round(event.values[2], 2) + " Vector: " + HelperClass.round(event.values[3], 2));
             rotationVectorText.setText(text);
+        } else if (sensor.getType() == Sensor.TYPE_MAGNETIC_FIELD)
+        {   inertiaData.setMagnetometerVector(event.values);
+            text = ("X: " + HelperClass.round(event.values[0], 2) + " Y: " + HelperClass.round(event.values[1], 2) + " Z: " + HelperClass.round(event.values[2], 2));
+            magnetometerText.setText(text);
         }
 
 
         if(isSendingData == true) {
             if (elapsedTimeMillis > millisPerFrame) {
-                frameTime = System.currentTimeMillis();
 
+                // Rotation matrix based on current readings from accelerometer and magnetometer.
+                final float[] rotationMatrix = new float[9];
+                SensorManager.getRotationMatrix(rotationMatrix, null,
+                        inertiaData.accelerometerVector, inertiaData.magnetometerVector);
+
+                // Express the updated rotation matrix as three orientation angles.
+                final float[] orientationAngles = new float[3];
+                SensorManager.getOrientation(rotationMatrix, orientationAngles);
+                                                                        //Blender Script Format
+                String orientationString =("( 0, 0, 0, "                //Position First    // GOAL - ( 0.56,0.13,-0.83, -4.20,-2.58,-3.48 ),
+                        + String.valueOf(orientationAngles[0]) + ", "   // Orientation Second
+                        + String.valueOf(orientationAngles[1]) + ", "
+                        + String.valueOf(orientationAngles[2]) + " ),");
+
+
+                frameTime = System.currentTimeMillis();
+               // initialVelocity = getVelocity(initialVelocity,inertiaData.getLinearAccelerationVector(),millisPerFrame);
+               // inertiaData.setDisplacement(HelperClass.addVectors(previousDisplacement, getDisplacement(initialVelocity, inertiaData.getLinearAccelerationVector(),millisPerFrame)));
+
+                //Send data to windows java exe application
                 BackgroundTask b1 = new BackgroundTask();
-                inertiaData.setDisplacement(getDisplacement(0, inertiaData.getLinearAccelerationVector(),millisPerFrame/1000));
-                b1.execute("frame " +  frame + " " + inertiaData.convertToString(inertiaData));
+                b1.execute(orientationString);
+                // b1.execute("frame " +  frame + " " + inertiaData.convertToString(inertiaData));
+                //b1.execute(Arrays.toString(getDisplacement(initialVelocity, inertiaData.getLinearAccelerationVector(),millisPerFrame)));
+                //b1.execute(inertiaData.convertToBlenderString(inertiaData));
+
+                //Set variables for next pass
+                previousDisplacement = inertiaData.getDisplacement();
                 frame++;
                 framesText.setText(String.valueOf(frame));
             }
+/*
             try {
                 cameraManager.setTorchMode(cameraID, false);
             } catch (CameraAccessException e) {
                 e.printStackTrace();
             }
+*/
         }
 
     }
 
-    public static float[] getDisplacement(float initialVelocity, float acceleration[], double time)
+    public static float[] getDisplacement(float initialVelocity[], float acceleration[], double time)
     {
-        //calculated in meters, converted to millimeters
-        String strDisplacement =" X: " + String.valueOf( ((initialVelocity*time) + 0.5*(acceleration[0]*(time*time)))*1000  ) +
-                                " Y: " + String.valueOf( ((initialVelocity*time) + 0.5*(acceleration[1]*(time*time)))*1000  ) +
-                                " Z: " +String.valueOf( ((initialVelocity*time) + 0.5*(acceleration[2]*(time*time)))*1000 );
+        //calculated in meters
+        //convert time to seconds from milliseconds
+
+        time = time/1000;
+
+        String strDisplacement =" X: " + String.valueOf( ((initialVelocity[0]*time) + 0.5*(acceleration[0]*(time*time)))  ) +
+                                " Y: " + String.valueOf( ((initialVelocity[1]*time) + 0.5*(acceleration[1]*(time*time)))  ) +
+                                " Z: " +String.valueOf( ((initialVelocity[2]*time) + 0.5*(acceleration[2]*(time*time))) );
 
         float[] displacement = new float[3];
-        displacement[0] = (float) (((initialVelocity * time) + 0.5 * (acceleration[0] * (time * time))) * 1000);
-        displacement[1] = (float) (((initialVelocity * time) + 0.5 * (acceleration[1] * (time * time))) * 1000);
-        displacement[2] = (float) (((initialVelocity * time) + 0.5 * (acceleration[2] * (time * time))) * 1000);
+        displacement[0] = (float) (((initialVelocity[0] * time) + 0.5 * (acceleration[0] * (time * time))));
+        displacement[1] = (float) (((initialVelocity[1] * time) + 0.5 * (acceleration[1] * (time * time))));
+        displacement[2] = (float) (((initialVelocity[2] * time) + 0.5 * (acceleration[2] * (time * time))));
 
         return displacement;
+    }
+
+    public static float[] getVelocity(float initialVelocity[], float acceleration[], double time)
+    {
+        //calculated in meters
+        //convert time to seconds from milliseconds
+        time = time/1000;
+
+        float[] finalVelocity = new float[3];
+        finalVelocity[0] = (float) (initialVelocity[0] + acceleration[0]*time);
+        finalVelocity[1] = (float) (initialVelocity[1] + acceleration[1]*time);
+        finalVelocity[2] = (float) (initialVelocity[2] + acceleration[2]*time);
+
+        return finalVelocity;
     }
 
     @Override
@@ -291,18 +367,18 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
 
 
 
-
     }
 
     class InertiaData
     {
         //Vectors
-        float accelerometerVector[];
-        float gravityVector[];
-        float gyroVector[];
-        float linearAccelerationVector[];
-        float rotationVector[];
-        float displacement[];
+        float[] accelerometerVector;
+        float[] gravityVector;
+        float[] gyroVector;
+        float[] linearAccelerationVector;
+        float[] rotationVector;
+        float[] displacement;
+        float[] magnetometerVector;
 
         public void setAccelerometerVector(float[] accelerometerVector) { this.accelerometerVector = accelerometerVector; }
 
@@ -328,6 +404,10 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
 
         public void setDisplacement(float[] displacement) { this.displacement = displacement; }
 
+        public float[] getMagnetometerVector() { return magnetometerVector; }
+
+        public void setMagnetometerVector(float[] magnetometerVector) { this.magnetometerVector = magnetometerVector; }
+
         public String convertToString(InertiaData data)
         {
             String text = "";
@@ -341,6 +421,19 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
 
             return text;
         }
+
+        public String convertToBlenderString(InertiaData data)
+        {
+            String text = "";
+            //text = (Arrays.toString(data.getDisplacement()) + Arrays.toString(data.getRotationVector()));
+            text = "( " + Arrays.toString(data.getDisplacement()) + " , " + Arrays.toString(data.getRotationVector()) + " ),";
+            return text;
+        }
     }
 
 }
+
+//  desired xyz transforms and rotations format for blender //
+//      ( 0.56,0.13,-0.83, -4.20,-2.58,-3.48 ),
+//      ( 0.74,0.19,-0.63, -4.40,-1.95,-3.67 ),
+//      ( 0.01,0.03,-0.57, 0,-1.61,-3.64 )

@@ -97,5 +97,14 @@ public class HelperClass {
         m[2][2] = c1 * c2;
     }
 
+    public static float[] addVectors (float v1[], float v2[])
+    {
+        float[] v = new float[3];
+        v[0] = v1[0]+v2[0];
+        v[1] = v1[1]+v2[1];
+        v[2] = v1[2]+v2[2];
+
+        return v;
+    }
 
 }
